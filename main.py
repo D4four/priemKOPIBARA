@@ -3,8 +3,9 @@ import pymorphy2
 from difflib import SequenceMatcher
 import inspect
 
+bot = telebot.TeleBot('6744225497:AAFV7H7f2l2bzDG5QQCkmkgOnhqKDMH6iEQ')
 morph = pymorphy2.MorphAnalyzer()
-
+tmp = []
 def normalize_text(text):
     words = text.split()
     normalized_words = [morph.parse(word)[0].normal_form for word in words]
@@ -15,8 +16,6 @@ def similarity_score(text1, text2):
     normalized_text2 = normalize_text(text2)
     matcher = SequenceMatcher(None, normalized_text1, normalized_text2)
     return matcher.ratio()
-
-bot = telebot.TeleBot('6744225497:AAFV7H7f2l2bzDG5QQCkmkgOnhqKDMH6iEQ')
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -54,7 +53,7 @@ def anyText(message):
         bot.register_next_step_handler(message, process)
 
 def process(message):
-    bot.send_message(message.chat.id, "Выберите интересующий истит")
+    # bot.send_message(message.chat.id, "Выберите интересующий истит")
     qa_pairs = {
         "Что такое вступительные испытания?": "ЕГЭ",
         "Как поступить": "Подать заявление",
@@ -75,15 +74,32 @@ def process(message):
     sorted_questions = sorted(qa_pairs.keys(), key=lambda question: similarity_scores[question], reverse=True)
 
     # Output the top three most similar questions and their scores
-    markup = telebot.types.InlineKeyboardMarkup()
+
+    tmp.clear()
     for i in range(min(3, len(sorted_questions))):
         current_question = sorted_questions[i]
-
-        btn = telebot.types.InlineKeyboardButton(text=f"{current_question}:", callback_data='')
-        markup.row(btn)
+        t = {
+            "q": "",
+            "a": ""
+        }
+        t["q"] = current_question
+        t["a"] = qa_pairs[current_question]
+        tmp.append(t)
+        # btn = telebot.types.InlineKeyboardButton(text=f"{current_question}:", callback_data='')
+        # markup.row(btn)
         # print(f"Возможно, вам будет интересен вопрос '{current_question}':")
         # print(f"Ответ: {qa_pairs[current_question]}, Сходство: {str(similarity_scores[current_question])}")
         # print()
+
+    markup = telebot.types.InlineKeyboardMarkup()
+    btn1 = telebot.types.InlineKeyboardButton(text=tmp[0]['q'], callback_data='question1')
+    btn3 = telebot.types.InlineKeyboardButton(text=tmp[1]['q'], callback_data='question2')
+    # markup.row(btn1, btn3)
+    btn2 = telebot.types.InlineKeyboardButton(text=tmp[2]['q'], callback_data='question3')
+    markup.row(btn1)
+    markup.row(btn2)
+    markup.row(btn3)
+    bot.send_message(message.chat.id, "Возможно вас интересуют вопросы:", reply_markup=markup)
 @bot.callback_query_handler(func=lambda callback: True)
 def callback_message(callback):
     if callback.data == 'first':
@@ -94,5 +110,11 @@ def callback_message(callback):
         bot.send_message(callback.message.chat.id, "Институт осуществляет обучение в области интеллектуальных систем управления техническими объектами, инновационных технологий в общепромышленной и специальной энергетике, термоядерной физики, электромеханических и робототехнических систем, энерго- и ресурсосбережения. Благодаря многопрофильной вузовской подготовке выпускники нашего института могут реализовать свои знания и творческий потенциал как в ядерно-энергетической отрасти, так и в других высокотехнологичных отраслях электротехнического и электрофизического профиля. Мы развиваем связи с реальным сектором экономики, академической и отраслевой наукой. Выпускники института с успехом работают на ведущих предприятиях Санкт-Петербурга и России.\n\nТел: +7-812-494-70-30  \n\nПочта: dept3@aanet.ru")
     elif callback.data == 'fourth':
         bot.send_message(callback.message.chat.id, "Институт является ведущим в университете в области компьютерных наук и их приложений. Выпускники института – это специалисты, бакалавры и магистры в области вычислительных машин, комплексов, систем и сетей, программного обеспечения вычислительной техники и автоматизированных систем, математического обеспечения и администрирования информационных систем, математического моделирования, информатики и вычислительной техники, электронных устройств и систем. Сегодня обучение в институте сочетает все аспекты подготовки в области IT – от микропроцессорных систем до виртуальной и дополненной реальности.\n\nТел: +7-812-494-70-40\n\nПочта: dek4@guap.ru")
+    elif callback.data == 'question1':
+        bot.send_message(callback.message.chat.id, tmp[0]['a'])
+    elif callback.data == 'question2':
+        bot.send_message(callback.message.chat.id, tmp[1]['a'])
+    elif callback.data == 'question3':
+        bot.send_message(callback.message.chat.id, tmp[2]['a'])
 
 bot.infinity_polling()
