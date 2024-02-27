@@ -1,11 +1,14 @@
 import telebot
 import pymorphy2
 from difflib import SequenceMatcher
-import inspect
+import sqlite3
+import random
 
-bot = telebot.TeleBot('6744225497:AAFV7H7f2l2bzDG5QQCkmkgOnhqKDMH6iEQ')
+bot = telebot.TeleBot('7002800267:AAH9fU86mn_-5Sggw4SxVv73vxvmohiy6wQ')
 morph = pymorphy2.MorphAnalyzer()
 tmp = []
+
+
 def normalize_text(text):
     words = text.split()
     normalized_words = [morph.parse(word)[0].normal_form for word in words]
@@ -16,7 +19,11 @@ def similarity_score(text1, text2):
     normalized_text2 = normalize_text(text2)
     matcher = SequenceMatcher(None, normalized_text1, normalized_text2)
     return matcher.ratio()
-
+def fetch_qa_pairs(cursor):
+    cursor.execute("SELECT question, answer FROM faqQuestion")
+    rows = cursor.fetchall()
+    qa_pairs = {row[0]: row[1] for row in rows}
+    return qa_pairs
 @bot.message_handler(commands=['start'])
 def start(message):
 
@@ -26,8 +33,10 @@ def start(message):
     markup.row(btn1, btn2)
     btn3 = telebot.types.KeyboardButton('Задать свой вопрос')
     markup.row(btn3)
-
-    file = open('./photo.jpg', 'rb')
+    btn4 = telebot.types.KeyboardButton('Еще кнопки..')
+    markup.row(btn4)
+    random_value = random.randint(0, 9)
+    file = open('./photo' + str(random_value) + '.jpg', 'rb')
     bot.send_photo(message.chat.id, file, caption=f'Привет, {message.from_user.first_name} {message.from_user.last_name}', reply_markup=markup, parse_mode='Markdown')
 
 @bot.message_handler()
@@ -51,29 +60,26 @@ def anyText(message):
 
     elif message.text.lower() == 'задать свой вопрос':
         bot.register_next_step_handler(message, process)
+    elif message.text.lower() == 'еще кнопки..':
+        markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn8 = telebot.types.KeyboardButton('кнопка раз')
+        btn9 = telebot.types.KeyboardButton('кнопка два')
+        markup.row(btn8, btn9)
+        bot.send_message(message.chat.id, "Еще кнопки..", reply_markup=markup)
 
 def process(message):
-    # bot.send_message(message.chat.id, "Выберите интересующий истит")
-    qa_pairs = {
-        "Что такое вступительные испытания?": "ЕГЭ",
-        "Как поступить": "Подать заявление",
-        "Какие индивидуальные достижения есть?": "Да",
-        "Как подать документы": "ЛК, ЕПГУ, очно",
-        "Есть ли военная кафедра": "Да",
-        "Как перевестись?": "Деканат",
-        "Стоимость обучения": "Пока нет.."
-        # Добавьте другие вопросы и ответы
-    }
+    conn = sqlite3.connect('faq.db')
+    cursor = conn.cursor()
+
+    qa_pairs = fetch_qa_pairs(cursor)
 
     user_input = message.text
 
-    # Calculate similarity scores for all questions
+    # Рассчитать оценки схожести для всех вопросов
     similarity_scores = {question: similarity_score(user_input, question) for question in qa_pairs.keys()}
 
-    # Sort questions based on similarity scores in descending order
+    # Отсортировать вопросы на основе оценок схожести по убыванию
     sorted_questions = sorted(qa_pairs.keys(), key=lambda question: similarity_scores[question], reverse=True)
-
-    # Output the top three most similar questions and their scores
 
     tmp.clear()
     for i in range(min(3, len(sorted_questions))):
@@ -85,11 +91,6 @@ def process(message):
         t["q"] = current_question
         t["a"] = qa_pairs[current_question]
         tmp.append(t)
-        # btn = telebot.types.InlineKeyboardButton(text=f"{current_question}:", callback_data='')
-        # markup.row(btn)
-        # print(f"Возможно, вам будет интересен вопрос '{current_question}':")
-        # print(f"Ответ: {qa_pairs[current_question]}, Сходство: {str(similarity_scores[current_question])}")
-        # print()
 
     markup = telebot.types.InlineKeyboardMarkup()
     btn1 = telebot.types.InlineKeyboardButton(text=tmp[0]['q'], callback_data='question1')
